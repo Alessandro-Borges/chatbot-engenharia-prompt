@@ -125,6 +125,7 @@ Esse `.env` é explicitamente **ignorado pelo Git** através do `.gitignore`, ju
 - **Memória limitada (1 GB):** exigiu disciplina para manter a VM enxuta. Delegar a inferência à API da NVIDIA foi a decisão de arquitetura que tornou o projeto viável nesse hardware.
 - **Acesso externo do Streamlit:** por padrão o Streamlit escuta apenas em `localhost`; foi necessário configurá-lo para escutar em `0.0.0.0` para aceitar conexões externas.
 - **Manter o app no ar:** rodar via terminal encerra a aplicação ao fechar a sessão SSH. A solução foi transformá-lo em serviço `systemd`, que reinicia sozinho.
+- **Estratégia de Deploy:** É possível enviar os arquivos de um computador para o servidor na nuvem via terminal, porém é mais complicado e difícil de reproduzir. Utilizar o github como repositório para copiar o necessário e futuras melhorias é uma estratégia mais eficiente e otimizada
 
 ---
 
