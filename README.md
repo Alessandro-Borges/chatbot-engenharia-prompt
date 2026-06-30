@@ -177,9 +177,9 @@ A implantação é parecida com a execução local, mas acontece **dentro da VM*
 
 **1) Conecte na VM via SSH** (rode no seu computador; ajuste o caminho da chave):
 ```bash
-ssh -i caminho/para/ssh-key-2026-03-14.key ubuntu@146.235.57.116
+ssh -i caminho/para/ssh-key.key {user_vm_oracle}@{ip_publico}
 ```
-> No Windows, antes de conectar, ajuste a permissão da chave com `icacls`. No macOS/Linux use `chmod 600 caminho/para/ssh-key-2026-03-14.key`.
+> No Windows, antes de conectar, ajuste a permissão da chave com `icacls`. No macOS/Linux use `chmod 600 caminho/para/ssh--key.key`.
 
 **2) No servidor, instale o básico e clone o repositório:**
 ```bash
@@ -211,7 +211,7 @@ echo "NVIDIA_API_KEY=nvapi-SUA_CHAVE_AQUI" > .env
 ```bash
 streamlit run app.py --server.address 0.0.0.0 --server.port 8501
 ```
-Teste no navegador: `http://146.235.57.116:8501`.
+Teste no navegador: `http://{ip_publico}.116:8501`.
 
 **7) Mantenha o app no ar permanentemente com `systemd`** (continua rodando após fechar o SSH). Crie `/etc/systemd/system/chatbot.service` com:
 ```ini
