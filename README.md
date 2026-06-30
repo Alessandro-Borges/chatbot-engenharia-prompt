@@ -111,13 +111,13 @@ Esse `.env` é explicitamente **ignorado pelo Git** através do `.gitignore`, ju
 
 1. Criação da instância Always Free com Ubuntu 22.04 e geração do par de chaves SSH.
 2. Liberação da porta `8501` na **Security List** da rede virtual (VCN) da Oracle.
-3. Liberação da mesma porta no firewall do sistema operacional (`iptables`/`ufw`).
+3. Liberação da mesma porta no firewall do sistema operacional (`iptables`).
 4. Acesso à VM via SSH e instalação de Python, `pip` e `venv`.
-5. Envio dos arquivos do projeto e criação de um ambiente virtual isolado.
+5. Clonagem do repositório e criação de um ambiente virtual isolado.
 6. Instalação das dependências do `requirements.txt` e criação do `.env` diretamente no servidor.
 7. Execução do Streamlit em `0.0.0.0:8501`, mantido ativo em segundo plano com `systemd`.
 
-> O passo a passo técnico completo e reproduzível está no arquivo [`GUIA_PASSO_A_PASSO.md`](./GUIA_PASSO_A_PASSO.md).
+> O passo a passo de produção, comando por comando, está na seção [**Como colocar em produção (Oracle Cloud)**](#como-colocar-em-produção-oracle-cloud) mais abaixo.
 
 ### Principais desafios encontrados
 
@@ -171,9 +171,71 @@ streamlit run app.py
 
 Acesse `http://localhost:8501`.
 
-### Em produção (Oracle Cloud)
+### Como colocar em produção (Oracle Cloud)
 
-Veja o guia detalhado em [`GUIA_PASSO_A_PASSO.md`](./GUIA_PASSO_A_PASSO.md).
+A implantação é parecida com a execução local, mas acontece **dentro da VM** e exige alguns passos extras de servidor e de rede. As diferenças em relação ao local são: (1) você acessa a máquina por **SSH**, (2) precisa **liberar a porta 8501 em duas camadas de firewall**, (3) o Streamlit precisa escutar em **`0.0.0.0`** (e não só em localhost) e (4) o app é mantido no ar por um serviço **`systemd`**.
+
+**1) Conecte na VM via SSH** (rode no seu computador; ajuste o caminho da chave):
+```bash
+ssh -i caminho/para/ssh-key-2026-03-14.key ubuntu@146.235.57.116
+```
+> No Windows, antes de conectar, ajuste a permissão da chave com `icacls`. No macOS/Linux use `chmod 600 caminho/para/ssh-key-2026-03-14.key`.
+
+**2) No servidor, instale o básico e clone o repositório:**
+```bash
+sudo apt update && sudo apt install -y python3-venv python3-pip git
+git clone https://github.com/SEU_USUARIO/chatbot-engenharia-prompt.git
+cd chatbot-engenharia-prompt
+```
+
+**3) Crie o ambiente virtual e instale as dependências:**
+```bash
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+**4) Crie o `.env` no servidor** (ele não vem do GitHub, pois é ignorado pelo `.gitignore`):
+```bash
+echo "NVIDIA_API_KEY=nvapi-SUA_CHAVE_AQUI" > .env
+```
+
+**5) Libere a porta 8501 nas DUAS camadas de firewall:**
+- **Camada 1 — Oracle:** no console da Oracle Cloud, vá em *Networking → VCN → Security List* e adicione uma **Ingress Rule**: Source `0.0.0.0/0`, protocolo `TCP`, porta de destino `8501`.
+- **Camada 2 — Ubuntu (no servidor):**
+  ```bash
+  sudo iptables -I INPUT 6 -m state --state NEW -p tcp --dport 8501 -j ACCEPT
+  sudo netfilter-persistent save
+  ```
+
+**6) Rode escutando em todas as interfaces** (`0.0.0.0` é essencial para acesso externo):
+```bash
+streamlit run app.py --server.address 0.0.0.0 --server.port 8501
+```
+Teste no navegador: `http://146.235.57.116:8501`.
+
+**7) Mantenha o app no ar permanentemente com `systemd`** (continua rodando após fechar o SSH). Crie `/etc/systemd/system/chatbot.service` com:
+```ini
+[Unit]
+Description=Chatbot Streamlit - Engenharia de Prompt
+After=network.target
+
+[Service]
+User=ubuntu
+WorkingDirectory=/home/ubuntu/chatbot-engenharia-prompt
+ExecStart=/home/ubuntu/chatbot-engenharia-prompt/.venv/bin/streamlit run app.py --server.address 0.0.0.0 --server.port 8501
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+```
+E ative o serviço:
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now chatbot
+sudo systemctl status chatbot     # deve aparecer "active (running)"
+```
+
+> Para atualizar a aplicação depois: `git pull` na pasta do projeto, no servidor, e `sudo systemctl restart chatbot`. O `.env` não é afetado pelo `git pull`.
 
 ---
 
@@ -181,13 +243,12 @@ Veja o guia detalhado em [`GUIA_PASSO_A_PASSO.md`](./GUIA_PASSO_A_PASSO.md).
 
 ```
 chatbot-engenharia-prompt/
-├── app.py                  # Aplicação Streamlit
-├── requirements.txt        # Dependências Python
-├── .gitignore              # Ignora .env, chaves e arquivos sensíveis
-├── README.md               # Este relatório
-└── GUIA_PASSO_A_PASSO.md   # Guia de implantação passo a passo
+├── app.py              # Aplicação Streamlit (código-fonte)
+├── requirements.txt    # Dependências Python
+├── .gitignore          # Ignora .env, chaves e arquivos sensíveis
+└── README.md           # Este relatório + instruções de instalação e execução
 
-# .env (não versionado) — criado manualmente com a NVIDIA_API_KEY, local e no servidor
+# .env (não versionado) — criado manualmente com a NVIDIA_API_KEY, na máquina local e no servidor
 ```
 
 ---
